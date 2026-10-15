@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+artifacts/
+.vs/
+*.user
+**/Library/
+**/Logs/
+**/Temp/
+**/UserSettings/
+**/__pycache__/
+*.pyc
+native/win-x64/
