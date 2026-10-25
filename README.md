@@ -1,122 +1,73 @@
 # Unity-HPS
 
-English | [简体中文](README.zh-CN.md)
+[简体中文](README.zh-CN.md)
 
-Unity-HPS is a standalone Humanoid pose conversion library and command-line application. It converts local bone poses to body position, body rotation and muscle values, and decodes Humanoid poses back to local bone poses. The solver runs without Unity or VRCSDK.
+Unity-HPS is a C# HumanPose solver and Windows x64 command-line application. It converts local skeleton poses to Humanoid RootT, RootQ and muscles, and decodes those curves back to local bone poses without loading Unity. It includes FBX rig import, calibrated response interpolation, anatomical upper projection, two-bone IK and source-guided FK branch continuation. VMD parsing and Unity `.anim` serialization belong to the caller, such as VMD Converter Core.
 
-## Features
-
-- Bone pose → Humanoid RootT, RootQ and muscle values.
-- Humanoid pose → local bone pose.
-- Optional two-bone IK goals before pose conversion.
-- Offline FBX skeleton import and Humanoid rig generation.
-- Optional Avatar-specific calibration and reusable response profiles.
-- Parallel frame processing, JSON input/output and a public C# SDK.
-
-Humanoid conversion uses an approximate response model. Use a rig matching the target skeleton and its Humanoid settings. Avatar-specific calibration is available for custom configurations.
-
-Unity-HPS processes skeletons and Humanoid poses. For PMX/VMD input and Unity `.anim` output, use VMD Converter Core with its Unity-HPS adapter.
-
-## Requirements and distribution
-
-The Windows x64 release runs without a Unity or .NET installation. Keep `UnityHps.Fbx.dll` beside `UnityHps.exe` when reading FBX files. The `managed/` directory contains the .NET 10 SDK; `unity/Editor/` contains optional Unity calibration tools.
-
-## Quick start
-
-Run these commands from the release directory:
+## CLI
 
 ```powershell
+.\UnityHps.exe rig --fbx avatar.fbx --output rig.json
+.\UnityHps.exe solve --rig rig.json --input poses.json --output result.json --threads 4 --passes 3 --range-policy tangent
+.\UnityHps.exe decode --rig rig.json --input human-poses.json --output local-poses.json --range-policy tangent
 .\UnityHps.exe --help
-.\UnityHps.exe rig --fbx avatar.fbx --output avatar-rig.json
-.\UnityHps.exe solve --rig avatar-rig.json --input poses.json --output human-poses.json --threads 8
-.\UnityHps.exe decode --rig avatar-rig.json --input human-poses.json --output decoded-poses.json
 ```
 
-`solve` accepts bone frames in the rig's bone order. Positions are in metres, quaternions use `[x,y,z,w]`, and all data uses normalized Animator root space. Each output frame contains `humanPose.bodyPosition`, `bodyRotation` and `muscles`. `bodyPosition` is normalized by `rig.humanScale`.
+`rig` uses adjacent FBX `.meta` automatically. Override with `--meta`; supply human-bone mappings with `--bone-map`, disable metadata with `--ignore-meta true`, or override source scale with `--scale`. `--profile` selects another portable response profile. Offline FBX rigs use portable responses; an exported Unity HPS rig contains native Avatar responses.
 
-See [the usage guide](docs/OFFLINE.md) for FBX mapping and calibration, and [the JSON protocol](docs/PROTOCOL.md) for input/output structures.
+Other commands: `fbx-info` exports skeleton/morph metadata; `inspect` describes a rig; `calibrate` fits root mass weights from pose/reference data; `profile` creates a portable response profile; `continue-fk` applies streaming source-guided FK roll continuity; `validate` compares against supplied HumanPose references and exits 2 if the requested limits fail. `demo` creates schema examples and `self-test` runs automated component checks. Each takes the paths listed by `--help`.
 
-## Commands and options
+`solve` and `validate` accept `--threads` (0 = automatic), `--passes` (default 2), `--leg-geometry`, `--arm-context` and `--decoded-root` (boolean, default false). `solve`, `decode` and `validate` accept `--range-policy strict|tangent`. Strict is the SDK/CLI default and rejects values outside the calibration lattice. Tangent extends boundary responses with bounded extrapolation and total-twist phase evaluation. Input poses use metres, xyzw unit quaternions and the exact rig bone order.
 
-Options use `--name value` pairs, including Boolean values such as `--ignore-meta true`.
+## Managed API
 
-| Command | Usage |
-| --- | --- |
-| `rig` | `--fbx avatar.fbx --output rig.json`; optional `--meta`, `--bone-map`, `--ignore-meta`, `--scale` (default `1`) and `--profile`. |
-| `fbx-info` | `--fbx avatar.fbx --output skeleton.json`; optional `--meta`, `--bone-map` and `--ignore-meta`. |
-| `solve` | `--rig rig.json --input poses.json --output result.json`; optional `--threads` (default `0`, automatic) and `--passes` (default `2`, range `1..20`). |
-| `decode` | `--rig rig.json --input human-poses.json --output poses.json`. |
-| `inspect` | `--rig rig.json`; prints skeleton and calibration information. |
-| `calibrate` | `--rig rig.json --input training.json --output calibrated-rig.json`. |
-| `profile` | `--rig calibrated-rig.json --output profile.json.gz`; optional `--mass-rig` supplies calibrated body-position weights. |
-| `validate` | `--rig rig.json --input reference.json --output report.json`; accepts `--threads`, `--passes` and the limits below. |
-| `demo` | `--output directory`; creates example rig and pose JSON files. |
-| `self-test` | Runs the built-in checks. |
-| `--help`, `-h`, `help` | Prints command usage. |
-
-`validate` compares frames containing `reference` data. Limits are `--max-root-mm` (default `0.1` mm), `--max-root-deg` (default `0.1` degrees) and `--max-muscle` (default `0.001`). Exit codes: `0` success, `1` invalid input or runtime failure, `2` validation limits exceeded.
-
-## Rig generation
-
-`rig` combines an FBX skeleton with the built-in Humanoid response profile. It reads adjacent `.fbx.meta` mappings when available; otherwise it uses bone names. Use `--bone-map` for explicit mappings and `--ignore-meta true` to ignore adjacent metadata.
-
-```powershell
-.\UnityHps.exe rig --fbx avatar.fbx --ignore-meta true --bone-map bones.json --output rig.json
-```
-
-The mapping file is a JSON object from Humanoid names to FBX node names, for example `{"Hips":"pelvis","LeftUpperLeg":"thigh_l"}`. Required mappings must be complete and unique. Rebuild the rig after changing the skeleton, import scale or Humanoid configuration. Bone paths in the generated rig refer to the imported skeleton.
-
-## Optional Unity calibration
-
-Copy the provided `unity/Editor/` scripts into `Assets/Editor/` in a Unity project. Select a valid Humanoid model or scene GameObject, then choose **Tools → Unity HPS → Export selected Humanoid calibration**. Calibrate the exported rig:
-
-```powershell
-.\UnityHps.exe calibrate --rig rig.json --input training.json --output calibrated-rig.json
-.\UnityHps.exe solve --rig calibrated-rig.json --input poses.json --output human-poses.json
-```
-
-Use the calibrated rig for subsequent conversions. Calibration requires Unity once; solving does not require it. Custom muscle limits and unsupported skeleton scaling may require this path.
-
-## C# SDK
-
-Reference `UnityHps.Core.dll` from a .NET 10 application. Keep `UnityHps.Fbx.dll` available when using FBX import.
+Reference `UnityHps.Core.dll` from .NET10 and keep `UnityHps.Fbx.dll` beside the application when importing FBX. Namespace: `UnityHps`.
 
 ```csharp
-using UnityHps;
-
-Rig rig = OfflineRigFactory.FromFbx("avatar.fbx", new FbxImportOptions());
-var solver = new HumanoidSolver(rig);
-PoseBatch input = HpsJson.ReadPoses("poses.json");
-ResultBatch result = solver.SolveBatch(input, threads: 8, passes: 2);
-HpsJson.Write("human-poses.json", result);
+Rig rig = HpsJson.ReadRig("rig.json");
+var solver = new HumanoidSolver(rig, rangePolicy: HumanoidRangePolicy.Tangent)
+{
+    FitDecodedArmContext = true,
+    ReconstructDecodedRoot = true
+};
+ResultBatch result = solver.SolveBatch(HpsJson.ReadPoses("poses.json"), 4, 3);
+PoseFrame local = solver.Decode(result.frames[0].humanPose.muscles,
+    result.frames[0].humanPose).ToFrame(result.frames[0].time);
 ```
 
-| API | Purpose |
-| --- | --- |
-| `HpsJson.ReadRig/ReadPoses/ReadHumanPoses/Write` | Rig, pose and result serialization. |
-| `FbxReader.Read` | Import an FBX skeleton, mappings and morph bindings. |
-| `OfflineRigFactory.FromFbx/FromSkeleton` | Generate an offline rig. |
-| `OfflineRigFactory.LoadProfile/Transfer` | Load and adapt a response profile. |
-| `HumanoidSolver.Solve/SolveBatch` | Convert one frame or a batch to Humanoid poses. |
-| `HumanoidSolver.Decode` | Decode muscles and body transforms to a skeleton pose. |
-| `HumanoidSolver.Compare` | Compare results with reference poses. |
-| `RootCalibration.Fit` | Fit a rig using calibration poses. |
-| `SkeletonPose.UpdateWorld`, `TwoBoneIk.Solve` | Update world transforms and solve limb IK. |
+- `OfflineRigFactory.FromFbx`, `FbxReader.Read`: offline skeleton, mappings and morphs.
+- `HumanoidSolver.Solve`, `SolveBatch`, `SolveMuscles`, `Decode`: pose/curve conversion, optional active human-bone groups and initial muscles.
+- `HumanoidSolver.ReconstructRoot`: root fitting after external muscle edits. `FitDecodedArmContext` fits arms under the decoded shoulder/body context; `FitLegGeometry` selects geometry-aware leg fitting. `AnchorLimbTwistToInitial` adds a soft initial twist prior.
+- `HumanoidUpperProjector.Project`: anatomical source/target upper projection; returns a new muscle array and preserves unselected channels.
+- `FkBranchContinuation.Process`: whole-sequence equivalent arm branches; preserves source/target arrays. `FkRollContinuation` provides the separate streaming forearm policy.
+- `HumanoidBodyMassCalibration.Fit`, `RootCalibration.Fit`: root mass calibration. Use independent reference data for acceptance before applying fitted weights.
+- `SkeletonPose`, `TwoBoneIk`, `AvatarDescriptorIO`, `HpsJson`: pose math, IK, FBX descriptors and serialization.
 
-Do not modify a rig after constructing its solver. A solver can be shared for batch frame processing. Unity 2022.3 callers should use the EXE/JSON interface rather than loading .NET 10 assemblies into the Editor.
+Batch solving shares immutable calibration/model data while frame state remains local. Root fitting uses the final muscle pose. Calibration coverage and target skeleton differences determine accuracy; portable FBX import and native Avatar calibration are distinct input types.
+
+## Native Unity calibration
+
+Copy `unity/Editor/UnityHpsCalibration.cs` into an Editor folder. In Unity, call `UnityHps.Reference.UnityHpsCalibration.Export(sourceGameObject, outputDirectory, resolution: 5, referenceFrames: 128, seed: 12345)`. It clones the Humanoid skeleton, samples `HumanPoseHandler` and writes `rig.json`, `training.json`, and `reference.json`. Run this on the Editor main thread. The exported JSON can subsequently be consumed offline; importing an FBX offline does not call Unity APIs.
 
 ## Build
 
-Install .NET 10 SDK, Visual Studio C++ desktop build tools and Windows SDK. From the repository root:
+Install .NET SDK10 and Visual Studio C++ x64 tools on Windows:
 
 ```powershell
-.\scripts\Build.ps1
-# Publish a self-contained build without NativeAOT:
-.\scripts\Build.ps1 -NoAot
+./scripts/Build.ps1
+# Framework-dependent SDK build:
+./scripts/Build-Native.ps1
+dotnet build src/UnityHps.Cli -c Release
 ```
 
-Both modes build the native FBX reader and require the C++ tools. The output is `artifacts/Unity-HPS-win-x64.zip`, containing the CLI, managed SDK, Unity integration scripts, documentation and licenses. GitHub Actions runs the same build and uploads the ZIP. Default response profiles are included; regular builds do not require Unity.
+The default executable uses NativeAOT. Add `-NoAot` to build a self-contained managed executable.
 
-## License
+| Output | Path |
+|---|---|
+| Executable | `artifacts/publish/win-x64/UnityHps.exe` |
+| Managed SDK | `artifacts/release/Unity-HPS-win-x64/managed/` |
+| Unity calibration script | `unity/Editor/UnityHpsCalibration.cs` |
 
-Unity-HPS is licensed under [Apache-2.0](LICENSE). See [NOTICE](NOTICE) for attribution. The bundled ufbx reader is distributed under its MIT license; its full license is in `third_party/ufbx/LICENSE` in source distributions and `ufbx-LICENSE.txt` in binary distributions.
+Upper response data is embedded in `UnityHps.Core.dll`; no external model-data directory is required.
+
+See [offline usage](docs/OFFLINE.md), [JSON protocol](docs/PROTOCOL.md), [LICENSE](LICENSE) and [third-party notices](NOTICE).

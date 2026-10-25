@@ -10,3 +10,8 @@ artifacts/
 **/__pycache__/
 *.pyc
 native/win-x64/
+
+# Local acceptance inputs, outputs and interim reports
+/work/
+/verification/
+/reports/

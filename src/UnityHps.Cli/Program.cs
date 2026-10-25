@@ -6,10 +6,12 @@ try
     if (args.Length == 0 || args[0] is "--help" or "-h" or "help")
     {
         Console.WriteLine("""
-        UnityHps - standalone calibrated HumanPose conversion prototype (no Unity runtime)
+        UnityHps - standalone calibrated HumanPose conversion (no Unity runtime)
         Commands:
           solve    --rig rig.json --input poses.json --output result.json [--threads 0] [--passes 2]
           decode   --rig rig.json --input human-poses.json --output poses.json
+          continue-fk --rig target-rig.json --input target-fk.json --source-rig source-rig.json
+                      --source raw-source-fk.json --output continuous-fk.json
           validate --rig rig.json --input reference.json --output report.json [--threads 0] [--passes 2]
                    [--max-root-mm 0.1] [--max-root-deg 0.1] [--max-muscle 0.001]
           inspect  --rig rig.json
@@ -21,11 +23,14 @@ try
           self-test
         solve: local bone poses -> RootT/RootQ/muscles; optional limb goals run before encoding.
         decode: RootT/RootQ/muscles -> local bone poses using an exported calibration lattice.
+        continue-fk: optional source-guided forearm roll continuity on decoded FK transforms.
         validate: compare against Unity GetHumanPose references; exit 2 when limits are exceeded.
         Frames use metres, xyzw unit quaternions, and the exported bone ordering.
         rig: offline FBX -> approximate default Humanoid rig; adjacent .fbx.meta is optional.
         Avatar-specific Unity calibration is optional and improves accuracy.
-        This prototype does not claim bitwise Unity equivalence.
+        solve/decode: --range-policy strict|tangent (default strict).
+        solve/validate: --leg-geometry true|false --arm-context true|false --decoded-root true|false.
+        Unity calibration export runs in the Editor; solve/decode require no Unity runtime.
         """);
         return 0;
     }
@@ -42,12 +47,14 @@ try
     string[] allowed = command switch
     {
         "self-test" => [], "demo" => ["--output"], "inspect" => ["--rig"],
-        "solve" => ["--rig", "--input", "--output", "--threads", "--passes"],
-        "decode" or "calibrate" => ["--rig", "--input", "--output"],
+        "solve" => ["--rig", "--input", "--output", "--threads", "--passes", "--range-policy", "--leg-geometry", "--arm-context", "--decoded-root"],
+        "decode" => ["--rig", "--input", "--output", "--range-policy"],
+        "calibrate" => ["--rig", "--input", "--output"],
+        "continue-fk" => ["--rig", "--input", "--source-rig", "--source", "--output"],
         "fbx-info" => ["--fbx", "--output", "--meta", "--bone-map", "--ignore-meta"],
         "rig" => ["--fbx", "--output", "--meta", "--bone-map", "--ignore-meta", "--scale", "--profile"],
         "profile" => ["--rig", "--output", "--mass-rig"],
-        "validate" => ["--rig", "--input", "--output", "--threads", "--passes", "--max-root-mm", "--max-root-deg", "--max-muscle"],
+        "validate" => ["--rig", "--input", "--output", "--threads", "--passes", "--max-root-mm", "--max-root-deg", "--max-muscle", "--range-policy", "--leg-geometry", "--arm-context", "--decoded-root"],
         _ => throw new ArgumentException("Unknown command: " + command)
     };
     foreach (string key in options.Keys) if (!allowed.Contains(key)) throw new ArgumentException("Unknown option: " + key);
@@ -63,6 +70,7 @@ try
             int[] slots=Enumerable.Range(0,group.bones.Length).Where(i=>group.bones[i]!=portable.hips&&group.samples.Any(s=>Math3.Angle(Math3.Q(s.rotations,i*4),Math3.Q(portable.bones[group.bones[i]].rotation))>0.001f)).ToArray();
             if(slots.Length==0) continue;
             compact.Add(new MuscleGroup {muscles=group.muscles,bones=slots.Select(i=>group.bones[i]).ToArray(),resolution=group.resolution,
+                muscleRanges=group.muscleRanges,
                 samples=group.samples.Select(s=>new LatticeSample {rotations=slots.SelectMany(i=>s.rotations.Skip(i*4).Take(4)).ToArray(),positions=slots.SelectMany(i=>portable.bones[group.bones[i]].position).ToArray()}).ToArray()});
         }
         portable.groups=compact.ToArray();
@@ -100,7 +108,21 @@ try
         HpsJson.Write(Path.Combine(directory, "poses.json"), Demo.CreatePoses(demoRig));
         Console.WriteLine("Synthetic demo written to " + Path.GetFullPath(directory)); return 0;
     }
-    Rig rig = HpsJson.ReadRig(Need("--rig")); var solver = new HumanoidSolver(rig);
+    Rig rig = HpsJson.ReadRig(Need("--rig"));
+    if (command == "continue-fk")
+    {
+        PoseBatch source = HpsJson.ReadPoses(Need("--source")), target = HpsJson.ReadPoses(Need("--input"));
+        if (source.version != 1 || target.version != 1 || target.frames.Length == 0 || source.frames.Length != target.frames.Length)
+            throw new InvalidDataException("Source and target FK batches need equal, nonzero frame counts and schema version 1.");
+        var continuation = new FkRollContinuation(HpsJson.ReadRig(Need("--source-rig")), rig);
+        var frames = target.frames.Select((f, i) => continuation.Process(source.frames[i], f)).ToArray();
+        HpsJson.Write(Need("--output"), new PoseBatch { frames = frames });
+        Console.WriteLine($"FK continuity: {frames.Length} frames; {continuation.AlteredForearmFrames} forearm-frame branch changes.");
+        return 0;
+    }
+    var policy = options.GetValueOrDefault("--range-policy", "strict") switch { "strict" => HumanoidRangePolicy.Strict, "tangent" => HumanoidRangePolicy.Tangent, _ => throw new ArgumentException("Invalid --range-policy") };
+    bool Flag(string name) => options.TryGetValue(name, out string? v) && bool.Parse(v);
+    var solver = new HumanoidSolver(rig, rangePolicy: policy) { FitLegGeometry = Flag("--leg-geometry"), FitDecodedArmContext = Flag("--arm-context"), ReconstructDecodedRoot = Flag("--decoded-root") };
     if (command == "inspect")
     {
         Console.WriteLine($"{rig.source}\nBones={rig.bones.Length}, muscles={rig.muscles.Length}, groups={rig.groups.Length}, humanScale={rig.humanScale:G9}");

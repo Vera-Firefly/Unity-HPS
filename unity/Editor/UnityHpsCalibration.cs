@@ -179,6 +179,12 @@ namespace UnityHps.Reference
                             handler.SetHumanPose(ref zero);
                             raw[sample] = Capture(transforms);
                             var readback = new HumanPose(); handler.GetHumanPose(ref readback);
+                            if (raw[sample].rotations.Any(v => !float.IsFinite(v)) ||
+                                raw[sample].positions.Any(v => !float.IsFinite(v)) ||
+                                readback.muscles.Any(v => !float.IsFinite(v)))
+                                throw new InvalidDataException("Non-finite native calibration: " + source.name + "/" +
+                                    HumanTrait.BoneName[group.Key] + " sample=" + sample + " input=" +
+                                    string.Join(",", channels.Select(ch => zero.muscles[ch].ToString("R", System.Globalization.CultureInfo.InvariantCulture))));
                             raw[sample].muscles = readback.muscles;
                             for (int b = 0; b < transforms.Length; b++)
                                 if (Quaternion.Angle(ReadQ(raw[sample].rotations, b * 4), ReadQ(neutral.rotations, b * 4)) > 0.00001f ||

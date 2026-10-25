@@ -32,6 +32,11 @@ try {
         Copy-Item -LiteralPath (Join-Path $repo "docs/$name") -Destination (Join-Path $bundle 'docs') -Force
     }
     Get-ChildItem -LiteralPath (Join-Path $repo 'unity/Editor') -Filter '*.cs' | Copy-Item -Destination (Join-Path $bundle 'unity/Editor') -Force
+    $manifest = @{}
+    foreach ($relative in @('UnityHps.exe','UnityHps.Fbx.dll','managed/UnityHps.Core.dll','managed/UnityHps.Fbx.dll')) {
+        $manifest[$relative] = (Get-FileHash -LiteralPath (Join-Path $bundle $relative) -Algorithm SHA256).Hash
+    }
+    $manifest | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $bundle 'build-manifest.json') -Encoding utf8
     Compress-Archive -LiteralPath $bundle -DestinationPath (Join-Path $repo "artifacts/Unity-HPS-$Runtime.zip") -Force
     Write-Host "Standalone executable: $publish/UnityHps.exe"
 } finally { Pop-Location }

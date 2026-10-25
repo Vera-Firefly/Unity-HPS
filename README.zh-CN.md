@@ -1,122 +1,73 @@
 # Unity-HPS
 
-[English](README.md) | 简体中文
+[English](README.md)
 
-Unity-HPS 是独立运行的 Humanoid 姿态转换库与命令行程序，用于将骨骼局部姿态转换为身体位置、身体旋转和肌肉值，并将 Humanoid 姿态还原为骨骼局部姿态。求解过程无需 Unity 或 VRCSDK。
+Unity-HPS 是 C# Humanoid 姿态求解程序集及 Windows x64 命令行程序。不加载 Unity，将骨架局部姿态转换为 RootT、RootQ、肌肉值，并可解码回局部骨骼姿态。支持 FBX rig 读取、标定响应插值、上肢解剖坐标投影、双骨 IK、参考源动作的 FK 分支连续性处理。VMD 解析和 `.anim` 写入由 VMD Converter Core 等调用方负责。
 
-## 功能
-
-- 骨骼姿态转换为 Humanoid RootT、RootQ 和肌肉值。
-- Humanoid 姿态还原为骨骼局部姿态。
-- 在姿态转换前应用可选的双骨骼 IK 目标。
-- 离线读取 FBX 骨架并生成 Humanoid rig。
-- 支持模型专用校准和可复用的肌肉响应模板。
-- 提供并行帧处理、JSON 输入输出和公开 C# SDK。
-
-Humanoid 转换采用近似响应模型。使用时应选择与目标骨架及 Humanoid 设置一致的 rig；自定义配置可使用模型专用校准。
-
-Unity-HPS 处理骨架和 Humanoid 姿态。若需读取 PMX/VMD 并生成 Unity `.anim`，请使用 VMD Converter Core 及其 Unity-HPS 适配器。
-
-## 运行要求与发布内容
-
-Windows x64 发布包无需安装 Unity 或 .NET。读取 FBX 时，须将 `UnityHps.Fbx.dll` 保留在 `UnityHps.exe` 同目录。`managed/` 包含 .NET 10 SDK，`unity/Editor/` 包含可选的 Unity 校准工具。
-
-## 快速开始
-
-在发布目录执行：
+## 命令行
 
 ```powershell
+.\UnityHps.exe rig --fbx avatar.fbx --output rig.json
+.\UnityHps.exe solve --rig rig.json --input poses.json --output result.json --threads 4 --passes 3 --range-policy tangent
+.\UnityHps.exe decode --rig rig.json --input human-poses.json --output local-poses.json --range-policy tangent
 .\UnityHps.exe --help
-.\UnityHps.exe rig --fbx avatar.fbx --output avatar-rig.json
-.\UnityHps.exe solve --rig avatar-rig.json --input poses.json --output human-poses.json --threads 8
-.\UnityHps.exe decode --rig avatar-rig.json --input human-poses.json --output decoded-poses.json
 ```
 
-`solve` 的输入骨骼顺序须与 rig 一致。位置单位为米，四元数顺序为 `[x,y,z,w]`，数据位于归一化 Animator 根节点空间。输出帧包含 `humanPose.bodyPosition`、`bodyRotation` 和 `muscles`；`bodyPosition` 按 `rig.humanScale` 归一化。
+`rig` 自动读取相邻 FBX `.meta`。`--meta` 覆盖文件，`--bone-map` 提供 Humanoid 骨骼映射，`--ignore-meta true` 禁用元数据，`--scale` 覆盖源缩放，`--profile` 指定可移植响应配置。离线 FBX 使用可移植响应；Unity 导出的 HPS rig 包含目标 Avatar 的原生响应。
 
-FBX 映射与校准步骤见[使用指南](docs/OFFLINE.md)，输入输出结构见 [JSON 数据协议](docs/PROTOCOL.md)。
+其他命令：`fbx-info` 导出骨架和形态键信息；`inspect` 查看 rig；`calibrate` 从姿态及 HumanPose 拟合根质量权重；`profile` 生成响应配置；`continue-fk` 使用流式前臂连续性策略；`validate` 与输入参考比对，不满足精度参数时返回 2；`demo` 生成协议示例；`self-test` 运行组件自动检查。路径参数见 `--help`。
 
-## 命令与参数
+`solve`／`validate` 支持 `--threads`（0 自动）、`--passes`（默认 2）、`--leg-geometry`、`--arm-context`、`--decoded-root`（布尔，默认 false）。`solve`／`decode`／`validate` 支持 `--range-policy strict|tangent`。SDK 与 CLI 默认 strict，拒绝超出标定采样范围；tangent 在有界范围内延拓边界响应，并对总扭转相位求值。输入单位为米，四元数为 xyzw，骨骼顺序必须与 rig 完全一致。
 
-参数采用 `--名称 值` 格式，布尔参数同样需要值，例如 `--ignore-meta true`。
+## 程序集接口
 
-| 命令 | 用法 |
-| --- | --- |
-| `rig` | `--fbx avatar.fbx --output rig.json`；可选 `--meta`、`--bone-map`、`--ignore-meta`、`--scale`（默认 `1`）、`--profile`。 |
-| `fbx-info` | `--fbx avatar.fbx --output skeleton.json`；可选 `--meta`、`--bone-map`、`--ignore-meta`。 |
-| `solve` | `--rig rig.json --input poses.json --output result.json`；可选 `--threads`（默认 `0`，自动选择）、`--passes`（默认 `2`，范围 `1..20`）。 |
-| `decode` | `--rig rig.json --input human-poses.json --output poses.json`。 |
-| `inspect` | `--rig rig.json`；显示骨架与校准信息。 |
-| `calibrate` | `--rig rig.json --input training.json --output calibrated-rig.json`。 |
-| `profile` | `--rig calibrated-rig.json --output profile.json.gz`；可选 `--mass-rig` 提供已校准的身体位置权重。 |
-| `validate` | `--rig rig.json --input reference.json --output report.json`；支持 `--threads`、`--passes` 和下述误差限值。 |
-| `demo` | `--output directory`；生成 rig 和姿态 JSON 示例。 |
-| `self-test` | 执行内置检查。 |
-| `--help`、`-h`、`help` | 显示命令帮助。 |
-
-`validate` 比较包含 `reference` 数据的输入帧。限值参数为 `--max-root-mm`（默认 `0.1` 毫米）、`--max-root-deg`（默认 `0.1` 度）、`--max-muscle`（默认 `0.001`）。退出码：`0` 成功，`1` 输入或运行错误，`2` 超出比较限值。
-
-## rig 生成
-
-`rig` 将 FBX 骨架与内置 Humanoid 响应模板结合。有相邻 `.fbx.meta` 时读取其中的骨骼映射，否则按骨骼名称识别。可用 `--bone-map` 指定映射，并用 `--ignore-meta true` 忽略相邻元数据。
-
-```powershell
-.\UnityHps.exe rig --fbx avatar.fbx --ignore-meta true --bone-map bones.json --output rig.json
-```
-
-映射文件是 Humanoid 骨名称到 FBX 节点名的 JSON 对象，例如 `{"Hips":"pelvis","LeftUpperLeg":"thigh_l"}`。必需骨骼映射须完整且唯一。修改骨架、导入比例或 Humanoid 设置后应重新生成 rig；rig 中的骨骼路径对应导入骨架。
-
-## 可选的 Unity 校准
-
-将提供的 `unity/Editor/` 脚本复制到 Unity 工程的 `Assets/Editor/`。选择有效的 Humanoid 模型或场景 GameObject，执行 **Tools → Unity HPS → Export selected Humanoid calibration**，然后校准导出的 rig：
-
-```powershell
-.\UnityHps.exe calibrate --rig rig.json --input training.json --output calibrated-rig.json
-.\UnityHps.exe solve --rig calibrated-rig.json --input poses.json --output human-poses.json
-```
-
-后续转换使用校准后的 rig。校准阶段需要 Unity，求解阶段无需 Unity。自定义肌肉限制或不受离线导入支持的骨架缩放可能需要此方式。
-
-## C# SDK
-
-在 .NET 10 程序中引用 `UnityHps.Core.dll`。调用 FBX 导入时，还须提供 `UnityHps.Fbx.dll`。
+.NET10 程序引用 `UnityHps.Core.dll`，读取 FBX 时还需同目录 `UnityHps.Fbx.dll`。命名空间为 `UnityHps`。
 
 ```csharp
-using UnityHps;
-
-Rig rig = OfflineRigFactory.FromFbx("avatar.fbx", new FbxImportOptions());
-var solver = new HumanoidSolver(rig);
-PoseBatch input = HpsJson.ReadPoses("poses.json");
-ResultBatch result = solver.SolveBatch(input, threads: 8, passes: 2);
-HpsJson.Write("human-poses.json", result);
+Rig rig = HpsJson.ReadRig("rig.json");
+var solver = new HumanoidSolver(rig, rangePolicy: HumanoidRangePolicy.Tangent)
+{
+    FitDecodedArmContext = true,
+    ReconstructDecodedRoot = true
+};
+ResultBatch result = solver.SolveBatch(HpsJson.ReadPoses("poses.json"), 4, 3);
+PoseFrame local = solver.Decode(result.frames[0].humanPose.muscles,
+    result.frames[0].humanPose).ToFrame(result.frames[0].time);
 ```
 
-| 接口 | 用途 |
-| --- | --- |
-| `HpsJson.ReadRig/ReadPoses/ReadHumanPoses/Write` | rig、姿态和结果序列化。 |
-| `FbxReader.Read` | 读取 FBX 骨架、映射和形态键绑定。 |
-| `OfflineRigFactory.FromFbx/FromSkeleton` | 生成离线 rig。 |
-| `OfflineRigFactory.LoadProfile/Transfer` | 加载并适配响应模板。 |
-| `HumanoidSolver.Solve/SolveBatch` | 转换单帧或批量 Humanoid 姿态。 |
-| `HumanoidSolver.Decode` | 将肌肉值和身体变换还原为骨骼姿态。 |
-| `HumanoidSolver.Compare` | 与参考姿态比较。 |
-| `RootCalibration.Fit` | 用校准姿态拟合 rig。 |
-| `SkeletonPose.UpdateWorld`、`TwoBoneIk.Solve` | 更新世界变换、求解肢体 IK。 |
+- `OfflineRigFactory.FromFbx`、`FbxReader.Read`：离线骨架、映射与形态键。
+- `HumanoidSolver.Solve`、`SolveBatch`、`SolveMuscles`、`Decode`：姿态／曲线转换，可选活动 HumanBone 分组和初始肌肉。
+- `ReconstructRoot`：外部修改肌肉后重算根运动。`FitDecodedArmContext` 在解码后的躯干和肩坐标中求手臂；`FitLegGeometry` 启用几何下肢拟合；`AnchorLimbTwistToInitial` 添加初始扭转软约束。
+- `HumanoidUpperProjector.Project`：源／目标上肢解剖投影，返回独立肌肉数组，不改动未选择通道。
+- `FkBranchContinuation.Process`：全序列等效手臂分支处理；不修改输入数组。`FkRollContinuation` 提供独立的流式前臂策略。
+- `HumanoidBodyMassCalibration.Fit`、`RootCalibration.Fit`：根质量标定，应用前使用独立参考验收。
+- `SkeletonPose`、`TwoBoneIk`、`AvatarDescriptorIO`、`HpsJson`：姿态、IK、FBX 描述及序列化。
 
-创建 solver 后不要修改其 rig。solver 可供批量帧处理共享。Unity 2022.3 调用方应使用 EXE/JSON 接口，不应在 Editor 中直接加载 .NET 10 程序集。
+批量共用不可变标定与模型数据，各帧状态独立。根运动依据最终肌肉求解。精度取决于标定覆盖及目标骨架差异；纯 FBX 与原生 Avatar 标定是不同输入类型。
+
+## Unity 原生标定
+
+将 `unity/Editor/UnityHpsCalibration.cs` 放入 Editor 目录，调用 `UnityHps.Reference.UnityHpsCalibration.Export(sourceGameObject, outputDirectory, resolution: 5, referenceFrames: 128, seed: 12345)`。它克隆 Humanoid 骨架，通过 `HumanPoseHandler` 采样，输出 `rig.json`、`training.json`、`reference.json`。该步骤在 Editor 主线程运行；导出结果可脱离 Unity 使用。离线读取 FBX 不会调用 Unity API。
 
 ## 构建
 
-安装 .NET 10 SDK、Visual Studio C++ 桌面开发工具和 Windows SDK，在仓库根目录执行：
+Windows 安装 .NET SDK10 与 Visual Studio C++ x64 工具：
 
 ```powershell
-.\scripts\Build.ps1
-# 不使用 NativeAOT，生成自包含版本：
-.\scripts\Build.ps1 -NoAot
+./scripts/Build.ps1
+# 常规程序集构建：
+./scripts/Build-Native.ps1
+dotnet build src/UnityHps.Cli -c Release
 ```
 
-两种方式均会构建原生 FBX 读取器，需要 C++ 工具。产物为 `artifacts/Unity-HPS-win-x64.zip`，包含 CLI、托管 SDK、Unity 集成脚本、文档和许可证。GitHub Actions 执行相同构建并上传 ZIP。默认响应模板已包含在仓库中，常规构建无需 Unity。
+默认生成 NativeAOT EXE；添加 `-NoAot` 可生成自包含托管 EXE。
 
-## 开源协议
+| 内容 | 路径 |
+|---|---|
+| 可执行文件 | `artifacts/publish/win-x64/UnityHps.exe` |
+| 托管 SDK | `artifacts/release/Unity-HPS-win-x64/managed/` |
+| Unity 标定脚本 | `unity/Editor/UnityHpsCalibration.cs` |
 
-Unity-HPS 使用 [Apache-2.0](LICENSE)，署名信息见 [NOTICE](NOTICE)。随附的 ufbx 读取器按其 MIT 许可分发；完整许可位于源码包的 `third_party/ufbx/LICENSE` 和二进制发布包的 `ufbx-LICENSE.txt`。
+上肢响应数据嵌入 `UnityHps.Core.dll`，运行时不需要额外的模型数据目录。
+
+详见 [离线用法](docs/OFFLINE.md)、[JSON 协议](docs/PROTOCOL.md)、[开源协议](LICENSE)、[第三方声明](NOTICE)。
