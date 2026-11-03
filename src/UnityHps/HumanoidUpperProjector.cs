@@ -176,14 +176,7 @@ public sealed partial class HumanoidUpperProjector
     double[] Fit(double[] query,int side,double[][][]? sourceResidual=null)
     {
         var points = (sourceResidual??residual)[side];
-        var nearest = new PriorityQueue<(int Index, double Distance), double>();
-        for (int i = 0; i < points.Length; i++)
-        {
-            double d = 0;
-            for (int j = 0; j < 5; j++) { double v = points[i][j] - query[j]; d += v * v; }
-            if (nearest.Count < count) nearest.Enqueue((i, d), -d);
-            else if (d < nearest.Peek().Distance) { nearest.Dequeue(); nearest.Enqueue((i, d), -d); }
-        }
+        var nearest = ResidualNeighborLookup.Find(points,query,count);
         var selected = nearest.UnorderedItems.Select(x => x.Element).ToArray();
         double bandwidth = Math.Max(selected.Max(x => x.Distance), 1e-12);
         var designs = new double[selected.Length][];
