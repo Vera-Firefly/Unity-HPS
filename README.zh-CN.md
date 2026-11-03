@@ -42,7 +42,10 @@ PoseFrame local = solver.Decode(result.frames[0].humanPose.muscles,
 - `ReconstructRoot`：外部修改肌肉后重算根运动。`FitDecodedArmContext` 在解码后的躯干和肩坐标中求手臂；`FitLegGeometry` 启用几何下肢拟合；`AnchorLimbTwistToInitial` 添加初始扭转软约束。
 - `HumanoidUpperProjector.Project`：源／目标上肢解剖投影，返回独立肌肉数组，不改动未选择通道。
 - `HumanoidUpperProjector.ProjectBatch`：按时间顺序投影整段动作并保持上肢连续性，可指定线程数、调度器及求值范围策略。
+- `HumanoidUpperProjector.ProjectSourceBatch`：使用内嵌源响应数据，按动作独立维护分支连续性。时间须有限、非负且严格递增；保留非上肢通道，不修改调用者输入，不需要外部标定文件或环境变量。
 - `HumanoidUpperProjector.StabilizeBatch`：对已拟合的上肢曲线进行连续性处理，保留其余肌肉通道。
+- `OfflineRigFactory.ForHumanoidLegEncoding`：生成用于大角度 Humanoid 编码的便携腿部响应 rig；保留输入 rig、非腿部响应及显式 Avatar 标定。
+- `HumanoidSolver(rig, activeHumanBones, rangePolicy, canonicalCurveTwists: true)`：拟合动画曲线时，将上肢轴向扭转限制在主值分支。原构造函数保留既有解码范围；`FitArmGeometry` 可独立于 `FitLegGeometry` 控制上肢几何拟合。
 - `FkBranchContinuation.Process`：全序列等效手臂分支处理；不修改输入数组。`FkRollContinuation` 提供独立的流式前臂策略。
 - `HumanoidBodyMassCalibration.Fit`、`RootCalibration.Fit`：根质量标定，应用前使用独立参考验收。
 - `SkeletonPose`、`TwoBoneIk`、`AvatarDescriptorIO`、`HpsJson`：姿态、IK、FBX 描述及序列化。

@@ -42,7 +42,10 @@ PoseFrame local = solver.Decode(result.frames[0].humanPose.muscles,
 - `HumanoidSolver.ReconstructRoot`: root fitting after external muscle edits. `FitDecodedArmContext` fits arms under the decoded shoulder/body context; `FitLegGeometry` selects geometry-aware leg fitting. `AnchorLimbTwistToInitial` adds a soft initial twist prior.
 - `HumanoidUpperProjector.Project`: anatomical source/target upper projection; returns a new muscle array and preserves unselected channels.
 - `HumanoidUpperProjector.ProjectBatch`: project an ordered motion with per-motion arm continuity; accepts worker count, scheduler and range policy.
+- `HumanoidUpperProjector.ProjectSourceBatch`: encode ordered source motion with per-motion branch continuity and embedded source responses. Frame times must be finite, nonnegative and strictly increasing; non-upper channels and caller-owned inputs are preserved. Source responses require no external calibration files or environment variables.
 - `HumanoidUpperProjector.StabilizeBatch`: continue already fitted arm curves while preserving other muscle channels.
+- `OfflineRigFactory.ForHumanoidLegEncoding`: create a portable leg response rig for large-angle Humanoid encoding. The input rig, non-leg groups and explicit Avatar calibrations are preserved.
+- `HumanoidSolver(rig, activeHumanBones, rangePolicy, canonicalCurveTwists: true)`: constrain arm axial twists to a principal chart when fitting animation curves. The existing constructor retains its decoding ranges. `FitArmGeometry` controls arm geometry fitting independently from `FitLegGeometry`.
 - `FkBranchContinuation.Process`: whole-sequence equivalent arm branches; preserves source/target arrays. `FkRollContinuation` provides the separate streaming forearm policy.
 - `HumanoidBodyMassCalibration.Fit`, `RootCalibration.Fit`: root mass calibration. Use independent reference data for acceptance before applying fitted weights.
 - `SkeletonPose`, `TwoBoneIk`, `AvatarDescriptorIO`, `HpsJson`: pose math, IK, FBX descriptors and serialization.
