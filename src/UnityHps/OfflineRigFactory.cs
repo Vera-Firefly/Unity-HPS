@@ -88,9 +88,9 @@ public static class OfflineRigFactory
     }
 
     /// <summary>
-    /// Create a portable leg encoding rig with analytic swing and distributed twist.
-    /// Only groups matching that response at every calibration node are replaced.
-    /// The input rig and explicitly calibrated responses are retained unchanged.
+    /// Add analytic leg responses to a portable default encoding rig, retaining
+    /// its skeleton and non-leg responses. Explicit Avatar calibrations are
+    /// returned unchanged; the input rig is not modified.
     /// </summary>
     public static Rig ForHumanoidLegEncoding(Rig poseRig)
     {

@@ -57,8 +57,7 @@ public sealed class MuscleGroup
     // Optional analytic two-axis shoulder swing, in neutral local coordinates.
     // Empty retains the measured lattice, including all existing calibrated rigs.
     public float[] shoulderSwingAxes { get; set; } = [];
-    // Optional limb swing/twist response, dimension-major then bone-major.
-    // The field names are retained for serialized rig compatibility.
+    // Optional arm swing/twist response, dimension-major then bone-major.
     public float[] armResponseAxes { get; set; } = [];
     public float[] armResponseRadians { get; set; } = [];
 }

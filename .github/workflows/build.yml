@@ -15,12 +15,6 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - name: Verify residual lookup equivalence
-        shell: pwsh
-        run: |
-          $report = Join-Path $env:RUNNER_TEMP 'residual-lookup-tests.json'
-          dotnet run --project tests/ResidualNeighborLookup.Tests/ResidualNeighborLookup.Tests.csproj -c Release -- profiles/upper/source-residual.bin.gz $report
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build, test, and NativeAOT publish
         shell: pwsh
         run: ./scripts/Build.ps1

@@ -40,19 +40,15 @@ sealed class SourcePoseAdapter
             Vector3 right = Get(14) - Get(13) + Get(2) - Get(1);
             return Math3.LookRotation(Vector3.Cross(right, up), up);
         }
-        NQ Frame(SkeletonPose p, Dictionary<int, int> by, int h, NQ body)
-        {
-            int child = h switch { 11 => 13, 12 => 14, 13 => 15, 14 => 16, 15 => 17, 16 => 18, _ => -1 };
-            if (child < 0) return body;
-            Vector3 direction = p.WorldPositions[by[child]] - p.WorldPositions[by[h]];
-            Vector3 forward = Vector3.Transform(Vector3.UnitZ, body), up = Vector3.Transform(Vector3.UnitY, body);
-            if (direction.LengthSquared() < 1e-12f) throw new InvalidDataException("Zero PMX arm segment.");
-            return Math3.LookRotation(direction, Math.Abs(Vector3.Dot(Vector3.Normalize(direction), forward)) > .9f ? up : forward);
-        }
         NQ sourceBody = Body(sourceBind, sourceByHuman), referenceBody = Body(referenceBind, referenceByHuman);
+        // A motion delta lives in one world frame. Conjugating that same delta
+        // separately by each segment's rest direction turns a rigid body motion
+        // into relative joint motion. Rest rotations already retain the target
+        // arm elevation and joint axes; only the body coordinate frame differs.
+        NQ bodyAlignment=NQ.Normalize(referenceBody*NQ.Inverse(sourceBody));
         var alignment = new Dictionary<int, NQ>();
         foreach (int h in referenceByHuman.Keys.Where(sourceByHuman.ContainsKey))
-            alignment[h] = NQ.Normalize(Frame(referenceBind, referenceByHuman, h, referenceBody) * NQ.Inverse(Frame(sourceBind, sourceByHuman, h, sourceBody)));
+            alignment[h] = bodyAlignment;
         return alignment;
     }
 
