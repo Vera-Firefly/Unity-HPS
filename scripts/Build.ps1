@@ -15,6 +15,10 @@ try {
     $single = if ($NoAot) { 'true' } else { 'false' }
     dotnet publish src/UnityHps.Cli -c Release -r $Runtime --self-contained true --configfile NuGet.Config -p:NuGetAudit=false "-p:PublishAot=$aot" "-p:PublishSingleFile=$single" -p:IncludeNativeLibrariesForSelfExtract=true -p:StripSymbols=true -o $publish
     if ($LASTEXITCODE -ne 0) { throw 'Publish failed. NativeAOT needs the Visual Studio C++ desktop build tools; alternatively use -NoAot.' }
+    foreach ($flag in @('--Version','--version')) {
+        $reportedVersion = & (Join-Path $publish 'UnityHps.exe') $flag
+        if ($LASTEXITCODE -ne 0 -or $reportedVersion -cne 'UnityHps 1.0.0 pre') { throw "Unexpected HPS version: $reportedVersion" }
+    }
     $bundle = Join-Path $repo "artifacts/release/Unity-HPS-$Runtime"
     New-Item -ItemType Directory -Force $bundle,(Join-Path $bundle 'managed'),(Join-Path $bundle 'unity/Editor'),(Join-Path $bundle 'docs') | Out-Null
     Copy-Item -LiteralPath (Join-Path $publish 'UnityHps.exe') -Destination $bundle -Force

@@ -1,5 +1,7 @@
 # Unity-HPS
 
+内部版本：**1.0.0 pre**。运行 `UnityHps.exe --Version`（兼容 `--version`）显示 `UnityHps 1.0.0 pre` 后退出，无需 rig 输入。托管调用可读取 `HpsVersion.Display`。程序集/包元数据采用预发布版本 `1.0.0-pre`，显示名称为 `1.0.0 pre`。
+
 [English](README.md)
 
 Unity-HPS 是 C# Humanoid 姿态求解程序集及 Windows x64 命令行程序。不加载 Unity，将骨架局部姿态转换为 RootT、RootQ、肌肉值，并可解码回局部骨骼姿态。支持 FBX rig 读取、标定响应插值、上肢解剖坐标投影、双骨 IK、参考源动作的 FK 分支连续性处理。VMD 解析和 `.anim` 写入由 VMD Converter Core 等调用方负责。

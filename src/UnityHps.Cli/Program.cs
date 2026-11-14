@@ -3,6 +3,11 @@ using UnityHps;
 
 try
 {
+    if (args.Length == 1 && string.Equals(args[0], "--version", StringComparison.OrdinalIgnoreCase))
+    {
+        Console.WriteLine("UnityHps " + HpsVersion.Display);
+        return 0;
+    }
     if (args.Length == 0 || args[0] is "--help" or "-h" or "help")
     {
         Console.WriteLine("""
@@ -21,6 +26,7 @@ try
           calibrate --rig rig.json --input training.json --output calibrated-rig.json
           demo     --output directory
           self-test
+          --Version / --version  Show version and exit
         solve: local bone poses -> RootT/RootQ/muscles; optional limb goals run before encoding.
         decode: RootT/RootQ/muscles -> local bone poses using an exported calibration lattice.
         continue-fk: optional source-guided forearm roll continuity on decoded FK transforms.

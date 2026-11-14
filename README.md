@@ -1,5 +1,7 @@
 # Unity-HPS
 
+Version: **1.0.0 pre**. Run `UnityHps.exe --Version` (also `--version`) to print `UnityHps 1.0.0 pre` and exit without loading a rig. Managed hosts can read `HpsVersion.Display`. Assembly/package metadata uses the prerelease version `1.0.0-pre`; the display label is `1.0.0 pre`.
+
 [简体中文](README.zh-CN.md)
 
 Unity-HPS is a C# HumanPose solver and Windows x64 command-line application. It converts local skeleton poses to Humanoid RootT, RootQ and muscles, and decodes those curves back to local bone poses without loading Unity. It includes FBX rig import, calibrated response interpolation, anatomical upper projection, two-bone IK and source-guided FK branch continuation. VMD parsing and Unity `.anim` serialization belong to the caller, such as VMD Converter Core.
