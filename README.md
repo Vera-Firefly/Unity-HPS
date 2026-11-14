@@ -1,7 +1,5 @@
 # Unity-HPS
 
-Version: **1.0.0 pre**. Run `UnityHps.exe --Version` (also `--version`) to print `UnityHps 1.0.0 pre` and exit without loading a rig. Managed hosts can read `HpsVersion.Display`. Assembly/package metadata uses the prerelease version `1.0.0-pre`; the display label is `1.0.0 pre`.
-
 [简体中文](README.zh-CN.md)
 
 Unity-HPS is a C# HumanPose solver and Windows x64 command-line application. It converts local skeleton poses to Humanoid RootT, RootQ and muscles, and decodes those curves back to local bone poses without loading Unity. It includes FBX rig import, calibrated response interpolation, anatomical upper projection, two-bone IK and source-guided FK branch continuation. VMD parsing and Unity `.anim` serialization belong to the caller, such as VMD Converter Core.
@@ -16,6 +14,8 @@ Unity-HPS is a C# HumanPose solver and Windows x64 command-line application. It 
 ```
 
 `rig` uses adjacent FBX `.meta` automatically. Override with `--meta`; supply human-bone mappings with `--bone-map`, disable metadata with `--ignore-meta true`, or override source scale with `--scale`. `--profile` selects another portable response profile. Offline FBX rigs use portable responses; an exported Unity HPS rig contains native Avatar responses.
+
+`--Version` (also `--version`) displays the version.
 
 Other commands: `fbx-info` exports skeleton/morph metadata; `inspect` describes a rig; `calibrate` fits root mass weights from pose/reference data; `profile` creates a portable response profile; `continue-fk` applies streaming source-guided FK roll continuity; `validate` compares against supplied HumanPose references and exits 2 if the requested limits fail. `demo` creates schema examples and `self-test` runs automated component checks. Each takes the paths listed by `--help`.
 
@@ -47,10 +47,10 @@ PoseFrame local = solver.Decode(result.frames[0].humanPose.muscles,
 - `HumanoidUpperProjector.ProjectBatch`: project an ordered motion with per-motion arm continuity; accepts worker count, scheduler and range policy.
 - `HumanoidUpperProjector.StabilizeBatch`: continue already fitted arm curves while preserving other muscle channels.
 - `FkBranchContinuation.Process`: whole-sequence equivalent arm branches; preserves source/target arrays. `FkRollContinuation` provides the separate streaming forearm policy.
-- `HumanoidBodyMassCalibration.Fit`, `RootCalibration.Fit`: root mass calibration. Use independent reference data for acceptance before applying fitted weights.
+- `HumanoidBodyMassCalibration.Fit`, `RootCalibration.Fit`: root mass calibration. Validate fitted weights against independent reference data before use.
 - `SkeletonPose`, `TwoBoneIk`, `AvatarDescriptorIO`, `HpsJson`: pose math, IK, FBX descriptors and serialization.
 
-Batch solving shares immutable calibration/model data. Ordered arm projection keeps history per motion; frame fitting remains parallel. Root fitting uses the final muscle pose. Calibration coverage and target skeleton differences determine accuracy; portable FBX import and native Avatar calibration are distinct input types.
+Calibration coverage and target skeleton differences determine accuracy; portable FBX import and native Avatar calibration are distinct input types.
 
 ## Native Unity calibration
 

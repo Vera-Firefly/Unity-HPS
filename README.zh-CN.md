@@ -1,7 +1,5 @@
 # Unity-HPS
 
-内部版本：**1.0.0 pre**。运行 `UnityHps.exe --Version`（兼容 `--version`）显示 `UnityHps 1.0.0 pre` 后退出，无需 rig 输入。托管调用可读取 `HpsVersion.Display`。程序集/包元数据采用预发布版本 `1.0.0-pre`，显示名称为 `1.0.0 pre`。
-
 [English](README.md)
 
 Unity-HPS 是 C# Humanoid 姿态求解程序集及 Windows x64 命令行程序。不加载 Unity，将骨架局部姿态转换为 RootT、RootQ、肌肉值，并可解码回局部骨骼姿态。支持 FBX rig 读取、标定响应插值、上肢解剖坐标投影、双骨 IK、参考源动作的 FK 分支连续性处理。VMD 解析和 `.anim` 写入由 VMD Converter Core 等调用方负责。
@@ -17,9 +15,11 @@ Unity-HPS 是 C# Humanoid 姿态求解程序集及 Windows x64 命令行程序�
 
 `rig` 自动读取相邻 FBX `.meta`。`--meta` 覆盖文件，`--bone-map` 提供 Humanoid 骨骼映射，`--ignore-meta true` 禁用元数据，`--scale` 覆盖源缩放，`--profile` 指定可移植响应配置。离线 FBX 使用可移植响应；Unity 导出的 HPS rig 包含目标 Avatar 的原生响应。
 
+`--Version`（兼容 `--version`）显示版本。
+
 其他命令：`fbx-info` 导出骨架和形态键信息；`inspect` 查看 rig；`calibrate` 从姿态及 HumanPose 拟合根质量权重；`profile` 生成响应配置；`continue-fk` 使用流式前臂连续性策略；`validate` 与输入参考比对，不满足精度参数时返回 2；`demo` 生成协议示例；`self-test` 运行组件自动检查。路径参数见 `--help`。
 
-`solve`／`validate` 支持 `--threads`（0 自动）、`--passes`（默认 2）、`--leg-geometry`、`--arm-context`、`--decoded-root`（布尔，默认 false）。`solve`／`decode`／`validate` 支持 `--range-policy strict|tangent`。SDK 与 CLI 默认 strict，拒绝超出标定采样范围；tangent 在有界范围内延拓边界响应，并对总扭转相位求值。输入单位为米，四元数为 xyzw，骨骼顺序必须与 rig 完全一致。
+`solve`／`validate` 支持 `--threads`（0 自动）、`--passes`（默认 2）、`--leg-geometry`、`--arm-context`、`--decoded-root`（布尔，默认 false）。`solve`／`decode`／`validate` 支持 `--range-policy strict|tangent`。SDK 与 CLI 默认 strict，拒绝超出标定采样范围；tangent 在有界范围内延拓边界响应，并对总扭转相位求值。Tangent 模式允许肩部摆动通道在角度范围需要时超过四个归一化单位；额外对称范围以 180° 除以正负角度范围中较大的绝对值确定，仍保留有限边界。输入单位为米，四元数为 xyzw，骨骼顺序必须与 rig 完全一致。
 
 ## 程序集接口
 
@@ -47,10 +47,10 @@ PoseFrame local = solver.Decode(result.frames[0].humanPose.muscles,
 - `HumanoidUpperProjector.ProjectBatch`：按时间顺序投影整段动作并保持上肢连续性，可指定线程数、调度器及求值范围策略。
 - `HumanoidUpperProjector.StabilizeBatch`：对已拟合的上肢曲线进行连续性处理，保留其余肌肉通道。
 - `FkBranchContinuation.Process`：全序列等效手臂分支处理；不修改输入数组。`FkRollContinuation` 提供独立的流式前臂策略。
-- `HumanoidBodyMassCalibration.Fit`、`RootCalibration.Fit`：根质量标定，应用前使用独立参考验收。
+- `HumanoidBodyMassCalibration.Fit`、`RootCalibration.Fit`：根质量标定，应用前使用独立参考数据验证。
 - `SkeletonPose`、`TwoBoneIk`、`AvatarDescriptorIO`、`HpsJson`：姿态、IK、FBX 描述及序列化。
 
-批量共用不可变标定与模型数据，上肢连续投影的历史按动作隔离，各帧拟合仍可并行。根运动依据最终肌肉求解。精度取决于标定覆盖及目标骨架差异；纯 FBX 与原生 Avatar 标定是不同输入类型。
+精度取决于标定覆盖及目标骨架差异；纯 FBX 与原生 Avatar 标定是不同输入类型。
 
 ## Unity 原生标定
 
@@ -78,5 +78,3 @@ dotnet build src/UnityHps.Cli -c Release
 上肢响应数据嵌入 `UnityHps.Core.dll`，运行时不需要额外的模型数据目录。
 
 详见 [离线用法](docs/OFFLINE.md)、[JSON 协议](docs/PROTOCOL.md)、[开源协议](LICENSE)、[第三方声明](NOTICE)。
-
-Tangent 模式允许肩部摆动通道在角度范围需要时超过四个归一化单位；额外对称范围以 180° 除以正负角度范围中较大的绝对值确定，仍保留有限边界。

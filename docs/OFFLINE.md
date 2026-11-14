@@ -11,6 +11,8 @@
 
 Custom Humanoid muscle limits in FBX metadata emit a warning and conversion continues with profile limits. Use an exported Avatar rig for measured responses to those settings. SDK callers can receive recoverable import warnings through `FbxImportOptions.Warning`; the default destination is standard error. Invalid skeleton data and unsupported affine bone scales remain errors.
 
+`--Version` (also `--version`) displays the version.
+
 Other commands: `fbx-info` exports skeleton/morph metadata; `inspect` describes a rig; `calibrate` fits root mass weights from pose/reference data; `profile` creates a portable response profile; `continue-fk` applies streaming source-guided FK roll continuity; `validate` compares against supplied HumanPose references and exits 2 if the requested limits fail. `demo` creates schema examples and `self-test` runs automated component checks. Each takes the paths listed by `--help`.
 
 `solve` and `validate` accept `--threads` (0 = automatic), `--passes` (default 2), `--leg-geometry`, `--arm-context` and `--decoded-root` (boolean, default false). `solve`, `decode` and `validate` accept `--range-policy strict|tangent`. Strict is the SDK/CLI default and rejects values outside the calibration lattice. Tangent extends boundary responses with bounded extrapolation and total-twist phase evaluation. Shoulder swing channels can exceed four normalized units when their angular limits require it; the additional symmetric range is bounded by 180 degrees divided by the larger absolute angular limit. Input poses use metres, xyzw unit quaternions and the exact rig bone order.
@@ -38,10 +40,10 @@ PoseFrame local = solver.Decode(result.frames[0].humanPose.muscles,
 - `HumanoidSolver.ReconstructRoot`: root fitting after external muscle edits. `FitDecodedArmContext` fits arms under the decoded shoulder/body context; `FitLegGeometry` selects geometry-aware leg fitting. `AnchorLimbTwistToInitial` adds a soft initial twist prior.
 - `HumanoidUpperProjector.Project`: anatomical source/target upper projection; returns a new muscle array and preserves unselected channels.
 - `FkBranchContinuation.Process`: whole-sequence equivalent arm branches; preserves source/target arrays. `FkRollContinuation` provides the separate streaming forearm policy.
-- `HumanoidBodyMassCalibration.Fit`, `RootCalibration.Fit`: root mass calibration. Use independent reference data for acceptance before applying fitted weights.
+- `HumanoidBodyMassCalibration.Fit`, `RootCalibration.Fit`: root mass calibration. Validate fitted weights against independent reference data before use.
 - `SkeletonPose`, `TwoBoneIk`, `AvatarDescriptorIO`, `HpsJson`: pose math, IK, FBX descriptors and serialization.
 
-Batch solving shares immutable calibration/model data while frame state remains local. Root fitting uses the final muscle pose. Calibration coverage and target skeleton differences determine accuracy; portable FBX import and native Avatar calibration are distinct input types.
+Calibration coverage and target skeleton differences determine accuracy; portable FBX import and native Avatar calibration are distinct input types.
 
 ## Native Unity calibration
 
